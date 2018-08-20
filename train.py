@@ -5,8 +5,7 @@ import subprocess
 import sys
 
 import torch
-from PIL import Image, ImageDraw
-import numpy as np
+from PIL import ImageDraw
 
 from models.dhSegment import dhSegment
 from utils.trainer import Trainer
@@ -14,7 +13,7 @@ from utils.logger import print_warning, print_normal
 from dataset.icdar_document_set import ICDARDocumentSet, ICDARDocumentEvalSet
 from utils.image import save_connected_components
 from utils.image import image_numpy_to_pillow, image_numpy_to_pillow_bw
-
+from evaluate import extract, output_baseline, output_image_bloc
 
 
 def main():
@@ -56,80 +55,6 @@ def main():
 
     train_database = ICDARDocumentSet("/home/tbelos/dataset/icdar/2017-baseline/train-complex", loss, True)
     trainer.train(train_database, batch_size=args.bs, callback=lambda: callback(model, loss, "/home/tbelos/dataset/icdar/2017-baseline/validation-complex"), epoch_limit=args.epochlimit)
-
-
-def extract(model, loss, original_image, resized_image, with_images=True):
-    """
-    Extract all the line from the given image
-
-    :param image: A tensor image
-    :return: The extracted line, as pillow image, and their positions
-    """
-    if type(original_image).__module__ == np.__name__:
-        original_image = torch.from_numpy(original_image).unsqueeze(0)
-
-    if type(resized_image).__module__ == np.__name__:
-        resized_image = torch.from_numpy(resized_image).unsqueeze(0)
-
-    is_cuda = next(model.parameters()).is_cuda
-
-    image = torch.autograd.Variable(resized_image).float()
-
-    if is_cuda:
-        image = image.cuda()
-    else:
-        image = image.cpu()
-
-    image = loss.process_labels(image)
-    result = model(torch.autograd.Variable(image))[0]
-    lines, components = loss.ytrue_to_lines(original_image.cpu().numpy()[0], result.cpu().detach().numpy(), with_images)
-
-    pillow_lines = [line for line, pos in lines]
-    pos = [pos for line, pos in lines]
-
-    return pillow_lines, pos, result, components
-
-
-def output_image_bloc(image, lines, lwidth=5):
-    """
-    Draw the lines to the image
-
-    :param image: The image
-    :param lines: The lines
-    :return: The new image
-    """
-    image = image_numpy_to_pillow(image.cpu().numpy()[0])
-    image = image.convert("L").convert("RGB")
-    image_drawer = ImageDraw.Draw(image)
-    for i in range(0, len(lines)):
-        positions = list(lines[i])
-        for i in range(0, len(positions) // 2 - 1):
-            image_drawer.line((positions[i * 2], positions[i * 2 + 1], positions[i * 2 + 2], positions[i * 2 + 3]),
-                              fill=(128, 0, 0), width=lwidth)
-
-    return image
-
-
-def output_baseline(lines):
-    """
-    Output a writable string of the lines
-
-    :param lines: The lines
-    :return: The string
-    """
-    result = ""
-
-    for positions in lines:
-        first_time = True
-        positions = list(positions)
-        for i in range(0, len(positions) // 2):
-            if not first_time:
-                result = result + ";"
-            result = result + str(int(positions[i * 2])) + "," + str(int(positions[i * 2 + 1]))
-            first_time = False
-        result = result + "\n"
-
-    return result
 
 
 def evaluate(model, loss, path):
