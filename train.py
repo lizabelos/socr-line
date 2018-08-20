@@ -35,6 +35,8 @@ def main():
     parser.add_argument('--epochlimit', type=int, default=None)
     parser.add_argument('--bnmomentum', type=float, default=0.1)
     parser.add_argument('--disablecuda', action='store_const', const=True, default=False)
+    parser.add_argument('--icdartrain', type=str)
+    parser.add_argument('--icdartest', type=str, default=None)
     args = parser.parse_args()
 
     model = dhSegment(args.losstype, args.hystmin, args.hystmax, args.thicknesses, args.heightimportance, args.bnmomentum)
@@ -54,7 +56,6 @@ def main():
     checkpoint_name = "checkpoints/" + args.name + ".pth.tar"
 
     epoch = 0
-    elapsed = 0
 
     if os.path.exists(checkpoint_name):
         print_normal("Restoring the weights...")
@@ -71,8 +72,12 @@ def main():
         for param_group in optimizer.param_groups:
             param_group['lr'] = args.lr
 
-    train_database = ICDARDocumentSet("/home/tbelos/dataset/icdar/2017-baseline/train-complex", loss, True)
-    test_database_path = "/home/tbelos/dataset/icdar/2017-baseline/validation-complex"
+    train_database = ICDARDocumentSet(args.icdartrain, loss, True)
+
+    if args.icdartest is not None:
+        test_database_path = args.icdartest
+    else:
+        test_database_path = args.icdartrain
 
     moving_average = MovingAverage(max(train_database.__len__() // args.bs, 1024))
 
@@ -135,7 +140,7 @@ def main():
 
 
 def collate(batch):
-    data = [item[0] for item in batch]  # just form a list of tensor
+    data = [item[0] for item in batch]
     label = [item[1] for item in batch]
 
     min_width = min([d.size()[1] for d in data])
@@ -169,6 +174,7 @@ def collate(batch):
     label = torch.stack(new_label)
 
     return [data, label]
+
 
 def evaluate(model, loss, path):
     """

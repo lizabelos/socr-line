@@ -24,3 +24,11 @@ python3 train.py
 ```
 python3 evaluate.py path
 ```
+
+## Dataset
+
+This is the link to ICDAR Complex Dataset :
+
+ftp://scruffy.caa.tuwien.ac.at/staff/read/cBAD-ICDAR2017/Train%20-%20Baseline%20Competition%20-%20Complex%20Documents.zip
+
+You you want to enable test during the training, you have to split yourself the dataset into a train part and a test part.
