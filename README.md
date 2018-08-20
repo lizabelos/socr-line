@@ -16,7 +16,7 @@ python3 setup.py build_ext --inplace
 ## Training
 
 ```
-python3 train.py
+python3 train.py --icdartrain [train_path]
 ```
 
 ## Evaluate
