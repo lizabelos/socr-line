@@ -3,22 +3,25 @@ import os
 import shutil
 import subprocess
 import sys
+from datetime import datetime
+from random import randint
+
 
 import torch
 from PIL import ImageDraw
 
 from models.dhSegment import dhSegment
-from utils.trainer import Trainer
-from utils.logger import print_warning, print_normal
+from utils.logger import print_normal, print_warning, TerminalColors
 from dataset.icdar_document_set import ICDARDocumentSet, ICDARDocumentEvalSet
 from utils.image import save_connected_components
 from utils.image import image_numpy_to_pillow, image_numpy_to_pillow_bw
 from evaluate import extract, output_baseline, output_image_bloc
+from utils.trainer import MovingAverage, CPUParallel
 
 
 def main():
     parser = argparse.ArgumentParser(description="socr")
-    parser.add_argument('--name', type=str, default=None)
+    parser.add_argument('--name', type=str, default="dhSegment")
     parser.add_argument('--lr', type=float, default=0.0001, help="Learning rate")
     parser.add_argument('--overlr', action='store_const', const=True, default=False)
     parser.add_argument('--bs', type=int, default=16)
@@ -29,24 +32,39 @@ def main():
     parser.add_argument('--expdecay', type=float, default=0.98)
     parser.add_argument('--heightimportance', type=float, default=0.03)
     parser.add_argument('--weightdecay', type=float, default=0.000001)
-    parser.add_argument('--epochlimit', type=int, default=75)
+    parser.add_argument('--epochlimit', type=int, default=None)
     parser.add_argument('--bnmomentum', type=float, default=0.1)
     parser.add_argument('--disablecuda', action='store_const', const=True, default=False)
     args = parser.parse_args()
 
-    model = dhSegment(args.losstype, args.hystmin, args.hystmax, args.thicknesses, args.heightimportance, args.expdecay, args.bnmomentum)
+    model = dhSegment(args.losstype, args.hystmin, args.hystmax, args.thicknesses, args.heightimportance, args.bnmomentum)
     loss = model.create_loss()
 
     if not args.disablecuda:
-        model = model.cuda()
+        model = torch.nn.DataParallel(model.cuda())
         loss = loss.cuda()
     else:
-        model = model.cpu()
+        model = CPUParallel(model.cpu())
         loss = loss.cpu()
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weightdecay)
+    adaptative_optimizer = torch.optim.lr_scheduler.ExponentialLR(optimizer, args.expdecay)
 
-    trainer = Trainer(model, loss, optimizer, args.name)
+    os.makedirs('checkpoints', exist_ok=True)
+    checkpoint_name = "checkpoints/" + args.name + ".pth.tar"
+
+    epoch = 0
+    elapsed = 0
+
+    if os.path.exists(checkpoint_name):
+        print_normal("Restoring the weights...")
+        checkpoint = torch.load(checkpoint_name)
+        epoch = checkpoint['epoch']
+        model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        adaptative_optimizer.load_state_dict(checkpoint['adaptative_optimizer'])
+    else:
+        print_warning("Can't find '" + checkpoint_name + "'")
 
     if args.overlr is not None:
         print_normal("Overwriting the lr to " + str(args.lr))
@@ -54,8 +72,103 @@ def main():
             param_group['lr'] = args.lr
 
     train_database = ICDARDocumentSet("/home/tbelos/dataset/icdar/2017-baseline/train-complex", loss, True)
-    trainer.train(train_database, batch_size=args.bs, callback=lambda: callback(model, loss, "/home/tbelos/dataset/icdar/2017-baseline/validation-complex"), epoch_limit=args.epochlimit)
+    test_database_path = "/home/tbelos/dataset/icdar/2017-baseline/validation-complex"
 
+    moving_average = MovingAverage(max(train_database.__len__() // args.bs, 1024))
+
+    try:
+        while True:
+            if args.epochlimit is not None and epoch > args.epochlimit:
+                print_normal("Epoch " + str(args.epochlimit) + "reached !")
+                break
+
+            model.train()
+
+            loader = torch.utils.data.DataLoader(train_database, batch_size=args.bs, shuffle=True, num_workers=4, collate_fn=collate)
+            for i, data in enumerate(loader, 0):
+
+                inputs, labels = data
+
+                optimizer.zero_grad()
+
+                variable = torch.autograd.Variable(inputs).float()
+                labels = torch.autograd.Variable(labels).float()
+
+                if not args.disablecuda:
+                    variable = variable.cuda()
+                    labels = labels.cuda()
+                else:
+                    variable = variable.cpu()
+                    labels = labels.cpu()
+
+                outputs = model(variable)
+                loss_value = loss.forward(outputs, labels)
+                loss_value.backward()
+
+                loss_value_cpu = loss_value.data.cpu().numpy()
+
+                optimizer.step()
+
+                loss_value_np = float(loss_value.data.cpu().numpy())
+                moving_average.addn(loss_value_np)
+
+                if (i * args.bs) % 8 == 0:
+                    sys.stdout.write(TerminalColors.BOLD + '[%d, %5d] ' % (epoch + 1, (i * args.bs) + 1) + TerminalColors.ENDC)
+                    sys.stdout.write('lr: %.8f; loss: %.4f ; curr: %.4f ;\r' % (optimizer.state_dict()['param_groups'][0]['lr'], moving_average.moving_average(), loss_value_cpu))
+
+            epoch = epoch + 1
+            adaptative_optimizer.step()
+
+            sys.stdout.write("\n")
+            callback(model, loss, test_database_path)
+
+    except KeyboardInterrupt:
+        pass
+
+    print_normal("Done training ! Saving...")
+    torch.save({
+        'epoch': epoch,
+        'state_dict': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+        'adaptative_optimizer': adaptative_optimizer.state_dict(),
+    }, checkpoint_name)
+
+
+def collate(batch):
+    data = [item[0] for item in batch]  # just form a list of tensor
+    label = [item[1] for item in batch]
+
+    min_width = min([d.size()[1] for d in data])
+    min_height = min([d.size()[0] for d in data])
+
+    min_width = min(min_width, 300)
+    min_height = min(min_height, 300)
+
+    new_data = []
+    new_label = []
+
+    for i in range(0, len(data)):
+        d = data[i]
+
+        crop_x = randint(0, d.size()[1] - min_width)
+        crop_y = randint(0, d.size()[0] - min_height)
+
+        d = d[crop_y:crop_y + min_height, crop_x:crop_x + min_width]
+        d = torch.transpose(d, 0, 2)
+        d = torch.transpose(d, 1, 2)
+        new_data.append(d)
+
+        d = label[i]
+
+        d = d[crop_y:crop_y + min_height, crop_x:crop_x + min_width]
+        d = torch.transpose(d, 0, 2)
+        d = torch.transpose(d, 1, 2)
+        new_label.append(d)
+
+    data = torch.stack(new_data)
+    label = torch.stack(new_label)
+
+    return [data, label]
 
 def evaluate(model, loss, path):
     """

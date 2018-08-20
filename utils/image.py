@@ -10,6 +10,7 @@ from matplotlib import pyplot
 from skimage import filters
 import cv2
 
+
 def image_pillow_to_numpy(image):
     image = np.array(image, dtype='float') / 255.0
     image = np.swapaxes(image, 0, 2)
@@ -22,6 +23,7 @@ def image_numpy_to_pillow(image):
     image = np.swapaxes(image, 0, 2)
     image = image * 255.0
     return Image.fromarray(image.astype('uint8'), 'RGB')
+
 
 def image_numpy_to_pillow_bw(image):
     image = image * 255.0

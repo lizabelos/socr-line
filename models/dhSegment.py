@@ -9,7 +9,7 @@ from utils.logger import print_normal
 
 class dhSegment(torch.nn.Module):
 
-    def __init__(self, loss_type="mse", hysteresis_minimum=0.5, hysteresis_maximum=0.5, thicknesses=2, height_importance=1.0, exponential_decay=1.0, bn_momentum=0.1):
+    def __init__(self, loss_type="mse", hysteresis_minimum=0.5, hysteresis_maximum=0.5, thicknesses=2, height_importance=1.0, bn_momentum=0.1):
         super(dhSegment, self).__init__()
 
         self.loss_type = loss_type
@@ -17,8 +17,7 @@ class dhSegment(torch.nn.Module):
         self.hysteresis_maximum = hysteresis_maximum
         self.thicknesses = thicknesses
         self.height_importance = height_importance
-        self.exponential_decay = exponential_decay
-        self.bn_momentum = 0.1
+        self.bn_momentum = bn_momentum
 
         self.inplanes = 64
 
@@ -145,10 +144,6 @@ class dhSegment(torch.nn.Module):
 
     def create_loss(self):
         return XHeightCCLoss(self.loss_type, self.hysteresis_minimum, self.hysteresis_maximum, self.thicknesses, self.height_importance)
-
-    def adaptative_learning_rate(self, optimizer):
-        print_normal("Using a exponential decay of " + str(self.exponential_decay))
-        return torch.optim.lr_scheduler.ExponentialLR(optimizer, self.exponential_decay)
 
     def get_name(self):
         return "dhSegment"

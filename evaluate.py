@@ -87,7 +87,7 @@ def output_baseline(lines):
 
 def main():
     parser = argparse.ArgumentParser(description="socr")
-    parser.add_argument('paths', metavar='N', type=string, nargs='+')
+    parser.add_argument('paths', metavar='N', type=str, nargs='+')
     parser.add_argument('--name', type=str, default=None)
     parser.add_argument('--lr', type=float, default=0.0001, help="Learning rate")
     parser.add_argument('--overlr', action='store_const', const=True, default=False)
@@ -171,4 +171,5 @@ def main():
 
         count = count + 1
 
-main()
+if __name__ == '__main__':
+    main()
