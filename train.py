@@ -8,10 +8,11 @@ from random import randint
 
 
 import torch
+import numpy as np
 from PIL import ImageDraw
 
 from models.dhSegment import dhSegment
-from utils.logger import print_normal, print_warning, TerminalColors
+from utils.logger import print_normal, print_warning, TerminalColors, print_error
 from dataset.icdar_document_set import ICDARDocumentSet, ICDARDocumentEvalSet
 from utils.image import save_connected_components
 from utils.image import image_numpy_to_pillow, image_numpy_to_pillow_bw
@@ -30,7 +31,7 @@ def main():
     parser.add_argument('--hystmin', type=float, default=0.5)
     parser.add_argument('--hystmax', type=float, default=0.5)
     parser.add_argument('--expdecay', type=float, default=0.98)
-    parser.add_argument('--heightimportance', type=float, default=0.03)
+    parser.add_argument('--heightimportance', type=float, default=0.001)
     parser.add_argument('--weightdecay', type=float, default=0.000001)
     parser.add_argument('--epochlimit', type=int, default=None)
     parser.add_argument('--bnmomentum', type=float, default=0.1)
@@ -74,10 +75,9 @@ def main():
 
     train_database = ICDARDocumentSet(args.icdartrain, loss, True)
 
+    test_database_path = None
     if args.icdartest is not None:
         test_database_path = args.icdartest
-    else:
-        test_database_path = args.icdartrain
 
     moving_average = MovingAverage(max(train_database.__len__() // args.bs, 1024))
 
@@ -125,7 +125,12 @@ def main():
             adaptative_optimizer.step()
 
             sys.stdout.write("\n")
-            callback(model, loss, test_database_path)
+
+            try:
+                if args.icdartest is not None:
+                    callback(model, loss, test_database_path)
+            except Exception as e:
+                print_error("Can't test : " + str(e))
 
     except KeyboardInterrupt:
         pass

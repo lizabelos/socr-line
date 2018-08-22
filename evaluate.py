@@ -3,6 +3,7 @@ import shutil
 import argparse
 
 import torch
+import numpy as np
 from PIL import ImageDraw
 
 from utils.dataset import FileDataset
@@ -32,7 +33,6 @@ def extract(model, loss, original_image, resized_image, with_images=True):
     else:
         image = image.cpu()
 
-    image = loss.process_labels(image)
     result = model(torch.autograd.Variable(image))[0]
     lines, components = loss.ytrue_to_lines(original_image.cpu().numpy()[0], result.cpu().detach().numpy(), with_images)
 
@@ -107,7 +107,7 @@ def main():
     if not os.path.exists("results"):
         os.makedirs("results")
 
-    model = dhSegment(args.losstype, args.hystmin, args.hystmax, args.thicknesses, args.heightimportance, args.expdecay, args.bnmomentum)
+    model = dhSegment(args.losstype, args.hystmin, args.hystmax, args.thicknesses, args.heightimportanc, args.bnmomentum)
     loss = model.create_loss()
 
     if not args.disablecuda:
