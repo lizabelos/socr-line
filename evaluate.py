@@ -1,6 +1,7 @@
 import os
 import shutil
 import argparse
+import subprocess
 
 import torch
 import numpy as np
@@ -9,6 +10,7 @@ from PIL import ImageDraw
 from utils.dataset import FileDataset
 from utils.image import image_numpy_to_pillow, image_numpy_to_pillow_bw, save_connected_components
 from models.dhSegment import dhSegment
+from utils.trainer import CPUParallel
 
 
 def extract(model, loss, original_image, resized_image, with_images=True):
@@ -88,7 +90,7 @@ def output_baseline(lines):
 def main():
     parser = argparse.ArgumentParser(description="socr")
     parser.add_argument('paths', metavar='N', type=str, nargs='+')
-    parser.add_argument('--name', type=str, default=None)
+    parser.add_argument('--name', type=str, default="dhSegment")
     parser.add_argument('--lr', type=float, default=0.0001, help="Learning rate")
     parser.add_argument('--overlr', action='store_const', const=True, default=False)
     parser.add_argument('--bs', type=int, default=16)
@@ -104,17 +106,19 @@ def main():
     parser.add_argument('--disablecuda', action='store_const', const=True, default=False)
     args = parser.parse_args()
 
+    subprocess.run(['rm', '-R', 'results'])
+
     if not os.path.exists("results"):
         os.makedirs("results")
 
-    model = dhSegment(args.losstype, args.hystmin, args.hystmax, args.thicknesses, args.heightimportanc, args.bnmomentum)
+    model = dhSegment(args.losstype, args.hystmin, args.hystmax, args.thicknesses, args.heightimportance, args.bnmomentum)
     loss = model.create_loss()
 
     if not args.disablecuda:
-        model = model.cuda()
+        model = torch.nn.DataParallel(model.cuda())
         loss = loss.cuda()
     else:
-        model = model.cpu()
+        model = CPUParallel(model.cpu())
         loss = loss.cpu()
 
     model.eval()
@@ -153,8 +157,8 @@ def main():
 
         os.makedirs("results/" + str(count))
 
-        for k in range(0, len(lines)):
-            image_numpy_to_pillow(lines[k]).save("results/" + str(count) + "/" + str(k) + ".jpg")
+        # for k in range(0, len(lines)):
+        #     image_numpy_to_pillow(lines[k]).save("results/" + str(count) + "/" + str(k) + ".jpg")
 
         xml_path = os.path.join(os.path.dirname(path[0]), os.path.splitext(os.path.basename(path[0]))[0] + ".xml")
         if os.path.exists(xml_path):
