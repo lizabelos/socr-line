@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--disablecuda', action='store_const', const=True, default=False)
     parser.add_argument('--icdartrain', type=str)
     parser.add_argument('--icdartest', type=str, default=None)
+    parser.add_argument('--generated', action='store_const', const=True, default=False)
     args = parser.parse_args()
 
     model = dhSegment(args.losstype, args.hystmin, args.hystmax, args.thicknesses, args.heightimportance, args.bnmomentum)
@@ -74,6 +75,12 @@ def main():
             param_group['lr'] = args.lr
 
     train_database = ICDARDocumentSet(args.icdartrain, loss, True)
+    generated_database = None
+
+    if args.generated:
+        sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "submodules/scribbler"))
+        from scribbler.generator import DocumentGenerator
+        generated_database = DocumentGenerator(loss)
 
     test_database_path = None
     if args.icdartest is not None:

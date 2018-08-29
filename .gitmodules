@@ -1,0 +1,3 @@
+[submodule "submodules/scribbler"]
+	path = submodules/scribbler
+	url = https://github.com/belosthomas/scribbler.git
