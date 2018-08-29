@@ -74,13 +74,14 @@ def main():
         for param_group in optimizer.param_groups:
             param_group['lr'] = args.lr
 
-    train_database = ICDARDocumentSet(args.icdartrain, loss, True)
-    generated_database = None
+    train_databases = [ICDARDocumentSet(args.icdartrain, loss, True)]
 
     if args.generated:
         sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)), "submodules/scribbler"))
         from scribbler.generator import DocumentGenerator
-        generated_database = DocumentGenerator(loss)
+        train_databases.append(DocumentGenerator(loss))
+
+    train_database = torch.utils.data.ConcatDataset(train_databases)
 
     test_database_path = None
     if args.icdartest is not None:

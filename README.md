@@ -46,6 +46,8 @@ You you want to enable test during the training, you have to split yourself the 
 
 ## Generated document
 
-You can also use Scribbler document generator from here [Scribbler](https://github.com/dtidmarsh/scribbler) by importing ```scribbler.generator.LineGeneratorSet```.
+Use the ```--generated``` argument to use generate document with ICDAR.
+
+[Scribbler](https://github.com/dtidmarsh/scribbler)
 
 To generate document with handwritten text, you will need to download the IAM dataset from here : [IAM Handwriting Database](http://www.fki.inf.unibe.ch/databases/iam-handwriting-database). At the initialization, please call init_iam_handwriting_line_dataset from scribbler.ressources.ressources_helper with the path of IAM dataset".
