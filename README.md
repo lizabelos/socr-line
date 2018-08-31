@@ -28,6 +28,39 @@ python3 train.py --icdartrain [train_path]
 
 If you want to enable test during the training, use the command line argument ```--icdartest```.
 
+Use the ```--help``` argument for more arguments, like the batch size or the learning rate.
+
+```
+usage: train.py [-h] [--name NAME] [--lr LR] [--overlr] [--bs BS]
+                [--losstype LOSSTYPE] [--thicknesses THICKNESSES]
+                [--hystmin HYSTMIN] [--hystmax HYSTMAX] [--expdecay EXPDECAY]
+                [--heightimportance HEIGHTIMPORTANCE]
+                [--weightdecay WEIGHTDECAY] [--epochlimit EPOCHLIMIT]
+                [--bnmomentum BNMOMENTUM] [--disablecuda]
+                [--icdartrain ICDARTRAIN] [--icdartest ICDARTEST]
+                [--generated]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --name NAME
+  --lr LR               Learning rate
+  --overlr              Override the learning rate
+  --bs BS               The batch size
+  --losstype LOSSTYPE   The loss type. Ex : mse, bce, norm
+  --thicknesses THICKNESSES Line thicknesses in the document
+  --hystmin HYSTMIN     Hysteresys thresholding minimum
+  --hystmax HYSTMAX     Hysteresys thresholding maximum
+  --expdecay EXPDECAY   Exponential decay
+  --heightimportance HEIGHTIMPORTANCE Height prediction importance during the training
+  --weightdecay WEIGHTDECAY Weight decay
+  --epochlimit EPOCHLIMIT Limit the number of epoch
+  --bnmomentum BNMOMENTUM BatchNorm Momentum
+  --disablecuda         Disable cuda
+  --icdartrain ICDARTRAIN Path to the ICDAR Training set
+  --icdartest ICDARTEST  Path to the ICDAR Testing set
+  --generated           Enable generated data
+```
+
 ## Evaluate
 
 To evaluate the network, where path is a directory or a image file, run : 
@@ -130,6 +163,6 @@ class XHeightCCLoss(torch.nn.Module):
 
 Use the ```--generated``` argument to use generate document with ICDAR.
 
-[Scribbler](https://github.com/dtidmarsh/scribbler)
+[Scribbler](https://github.com/belosthomas/scribbler)
 
 To generate document with handwritten text, you will need to download the IAM dataset from here : [IAM Handwriting Database](http://www.fki.inf.unibe.ch/databases/iam-handwriting-database). At the initialization, please call init_iam_handwriting_line_dataset from scribbler.ressources.ressources_helper with the path of IAM dataset".
