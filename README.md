@@ -26,7 +26,7 @@ To train the network, run :
 python3 train.py --icdartrain [train_path]
 ```
 
-If you want to enable test during the training, use the commande line argument ```--icdartest```.
+If you want to enable test during the training, use the command line argument ```--icdartest```.
 
 ## Evaluate
 
